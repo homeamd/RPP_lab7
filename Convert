@@ -1,0 +1,48 @@
+import uvicorn
+import psycopg2 as pg
+from fastapi import FastAPI, HTTPException
+import re
+
+
+app = FastAPI()
+
+conn = pg.connect(user='postgres', password='postgres', host='localhost', port='5432', database='postgres')
+cursor = conn.cursor()
+
+
+def check(name):
+    cursor.execute("""SELECT id FROM currency_rates 
+                      WHERE base_currency = %s""", (name,))
+    data_id = cursor.fetchall()
+    data_id = re.sub(r"[^0-9]", r"", str(data_id))
+    return data_id
+
+
+def get(name, id):
+    cursor.execute("""SELECT rate FROM currency_rates_values 
+                      WHERE currency_rate_id = %s AND currency_code = %s""", (id, name,))
+    data_id = cursor.fetchall()
+    data_id = re.sub(r"[^0-9]", r"", str(data_id))
+    return data_id
+
+
+@app.get("/convert")
+def convert_get(baseCurrency: str, convertedCurrency: str, sum: float):
+    try:
+        baseCurrency = int(check(baseCurrency))
+        print(baseCurrency)
+        print(convertedCurrency)
+        convertedCurrency = float(get(convertedCurrency, baseCurrency))
+        print(convertedCurrency)
+        print(sum)
+        if convertedCurrency != 0 and baseCurrency != 0:
+            res = (convertedCurrency / 10000) * sum
+            print(res)
+            return {'converted': res}
+        raise HTTPException(500)
+    except:
+        raise HTTPException(500)
+
+
+if __name__ == '__main__':
+    uvicorn.run(app, port=10601, host='localhost')
